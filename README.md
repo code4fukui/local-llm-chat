@@ -34,6 +34,18 @@ python3 -m http.server 5173
 
 その後、WebGPU 対応ブラウザで `http://localhost:5173` を開きます。
 
+`index.html` は `bundle.js` を読み込みます。`main.js` を編集した後は、Deno で依存をまとめた `bundle.js` を再生成します。
+
+```sh
+npm run bundle
+```
+
+直接実行する場合:
+
+```sh
+deno bundle --allow-import main.js -o bundle.js
+```
+
 構文チェック:
 
 ```sh

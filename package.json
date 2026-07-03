@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 5173",
-    "check": "node -e \"const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const match=html.match(/<script type=\\\"module\\\">([\\\\s\\\\S]*?)<\\\\/script>/);if(!match)throw new Error('inline module script not found');fs.writeFileSync('/tmp/local-llm-chat-inline-check.mjs',match[1]);\" && node --check /tmp/local-llm-chat-inline-check.mjs"
+    "bundle": "deno bundle --allow-import main.js -o bundle.js && node -e \"const fs=require('fs');const file='bundle.js';const code=fs.readFileSync(file,'utf8').replace(/^\\/\\/ deno:https?:\\/\\/[^\\n]*\\n/,'');fs.writeFileSync(file,code);\"",
+    "check": "node --check bundle.js"
   }
 }
