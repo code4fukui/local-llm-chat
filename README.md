@@ -40,17 +40,7 @@ python3 -m http.server 5173
 
 三択クイズアプリは `http://localhost:5173/quiz3.html` で開けます。
 
-`index.html` は `bundle.js` を読み込みます。`main.js` を編集した後は、Deno で依存をまとめた `bundle.js` を再生成します。
-
-```sh
-npm run bundle
-```
-
-直接実行する場合:
-
-```sh
-deno bundle --allow-import main.js -o bundle.js
-```
+`index.html` は `main.js` を ES module として直接読み込みます。`quiz3.html` も含め、WebLLM は `https://code4fukui.github.io/web-llm/web-llm.js` から読み込みます。
 
 構文チェック:
 

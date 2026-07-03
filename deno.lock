@@ -1,10 +1,6 @@
 {
   "version": "5",
-  "redirects": {
-    "https://esm.run/@mlc-ai/web-llm": "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/+esm"
-  },
   "remote": {
-    "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm/+esm": "d1ecb2579991ee53fa4f00e2f1b76841419d7b2d48f64c7cdf23968a72f2eba5",
     "https://code4fukui.github.io/web-llm/web-llm.js": "6386fb906799e179f372409be905737ee11a4ddb06c50992d11fa118bf5ffe07"
   }
 }

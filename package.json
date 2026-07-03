@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 5173",
-    "bundle": "deno bundle --allow-import main.js -o bundle.js && node -e \"const fs=require('fs');const file='bundle.js';const code=fs.readFileSync(file,'utf8').replace(/^\\/\\/ deno:https?:\\/\\/[^\\n]*\\n/,'');fs.writeFileSync(file,code);\"",
-    "check": "node --check bundle.js"
+    "check": "deno check --allow-import main.js"
   }
 }
