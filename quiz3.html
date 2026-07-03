@@ -386,6 +386,7 @@
           <div class="button-row">
             <button id="loadButton">Load</button>
             <button id="newButton" class="primary">出題</button>
+            <button id="clearIndexedDbButton" type="button">Clear IndexedDB</button>
           </div>
         </section>
 
@@ -423,6 +424,7 @@
         topicInputs: [...document.querySelectorAll('input[name="topic"]')],
         loadButton: document.querySelector("#loadButton"),
         newButton: document.querySelector("#newButton"),
+        clearIndexedDbButton: document.querySelector("#clearIndexedDbButton"),
         progressBar: document.querySelector("#progressBar"),
         statusText: document.querySelector("#statusText"),
         question: document.querySelector("#question"),
@@ -439,6 +441,12 @@
       let correctCount = 0;
       let answeredCount = 0;
       const MAX_TOKENS = 2048;
+      const INDEXED_DB_NAMES = [
+        "local-llm-chat",
+        "webllm/config",
+        "webllm/wasm",
+        "webllm/model",
+      ];
 
       init();
 
@@ -448,6 +456,7 @@
           loadModel(true).catch(() => {});
         });
         els.newButton.addEventListener("click", generateQuiz);
+        els.clearIndexedDbButton.addEventListener("click", clearIndexedDbData);
       }
 
       async function checkWebGpu() {
@@ -664,6 +673,7 @@
         busy = isBusy;
         els.loadButton.disabled = isBusy;
         els.newButton.disabled = isBusy;
+        els.clearIndexedDbButton.disabled = isBusy;
       }
 
       function setStatus(text, progress) {
@@ -691,6 +701,50 @@
           .filter((input) => input.checked)
           .map((input) => input.value);
         return topics.length ? topics.join("、") : "一般教養";
+      }
+
+      async function clearIndexedDbData() {
+        const confirmed = confirm(
+          "IndexedDB のモデルキャッシュなど、このオリジンのアプリデータを削除します。よろしいですか？",
+        );
+        if (!confirmed || busy) return;
+
+        setBusy(true);
+        setStatus("Clearing IndexedDB", 0.1);
+
+        try {
+          engine?.unload?.();
+          engine = null;
+          loadedModelId = "";
+          currentQuiz = null;
+          correctCount = 0;
+          answeredCount = 0;
+          updateScore();
+          await Promise.all(INDEXED_DB_NAMES.map((dbName) => deleteDatabase(dbName)));
+          els.question.textContent = "「出題」を押すとモデルを読み込んで問題を作ります。";
+          els.question.className = "empty";
+          els.choices.innerHTML = "";
+          setComment("IndexedDBを削除しました。次回出題時にモデルを読み込み直します。", true);
+          setStatus("IndexedDB cleared", 1);
+        } catch (error) {
+          setStatus(
+            `Failed to clear IndexedDB: ${error.message}. Close other tabs using this app and try again.`,
+            0,
+          );
+          setComment(error.message, true);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function deleteDatabase(dbName) {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.deleteDatabase(dbName);
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+          request.onblocked = () =>
+            reject(new Error(`Database "${dbName}" is blocked by an open connection`));
+        });
       }
     </script>
   </body>

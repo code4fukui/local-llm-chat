@@ -1,4 +1,4 @@
-import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+import * as webllm from "https://code4fukui.github.io/web-llm/web-llm.js";
 
 const DB_NAME = "local-llm-chat";
 const DB_VERSION = 1;
@@ -6,6 +6,7 @@ const STORE = {
   messages: "messages",
   settings: "settings",
 };
+const WEBLLM_INDEXED_DB_NAMES = ["webllm/config", "webllm/wasm", "webllm/model"];
 
 const MODEL_LIB_BASE =
   "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_84/base";
@@ -80,6 +81,7 @@ const els = {
   topPInput: document.querySelector("#topPInput"),
   loadButton: document.querySelector("#loadButton"),
   clearButton: document.querySelector("#clearButton"),
+  clearIndexedDbButton: document.querySelector("#clearIndexedDbButton"),
   progressBar: document.querySelector("#progressBar"),
   statusText: document.querySelector("#statusText"),
   messages: document.querySelector("#messages"),
@@ -127,6 +129,7 @@ function bindEvents() {
 
   els.loadButton.addEventListener("click", loadModel);
   els.clearButton.addEventListener("click", clearChat);
+  els.clearIndexedDbButton.addEventListener("click", clearIndexedDbData);
   els.stopButton.addEventListener("click", stopGeneration);
   els.chatForm.addEventListener("submit", sendMessage);
   els.promptInput.addEventListener("input", autoGrow);
@@ -378,6 +381,42 @@ async function clearChat() {
   renderMessages();
 }
 
+async function clearIndexedDbData() {
+  const confirmed = confirm(
+    "IndexedDB のチャット履歴、設定、モデルキャッシュを削除します。よろしいですか？",
+  );
+  if (!confirmed) return;
+
+  stopGeneration();
+  setBusy(true);
+  setStatus("Clearing IndexedDB", 0.1);
+
+  try {
+    engine?.unload?.();
+    engine = null;
+    db?.close();
+    db = null;
+    messages = [];
+    await Promise.all([
+      deleteDatabase(DB_NAME),
+      ...WEBLLM_INDEXED_DB_NAMES.map((dbName) => deleteDatabase(dbName)),
+    ]);
+    db = await openDb();
+    applySettings(presets[DEFAULT_PRESET]);
+    renderMessages();
+    els.promptInput.disabled = true;
+    els.sendButton.disabled = true;
+    setStatus("IndexedDB cleared. Load the model again.", 1);
+  } catch (error) {
+    setStatus(
+      `Failed to clear IndexedDB: ${error.message}. Close other tabs using this app and try again.`,
+      0,
+    );
+  } finally {
+    setBusy(false);
+  }
+}
+
 function createMessage(role, content) {
   return {
     id: crypto.randomUUID(),
@@ -441,6 +480,7 @@ function setStatus(text, progress) {
 
 function setBusy(isBusy) {
   els.loadButton.disabled = isBusy;
+  els.clearIndexedDbButton.disabled = isBusy;
 }
 
 function setGenerating(isGenerating) {
@@ -479,6 +519,16 @@ function requestToPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  });
+}
+
+function deleteDatabase(dbName) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(dbName);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () =>
+      reject(new Error(`Database "${dbName}" is blocked by an open connection`));
   });
 }
 
