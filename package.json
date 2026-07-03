@@ -1,0 +1,10 @@
+{
+  "name": "local-llm-chat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "check": "node -e \"const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const match=html.match(/<script type=\\\"module\\\">([\\\\s\\\\S]*?)<\\\\/script>/);if(!match)throw new Error('inline module script not found');fs.writeFileSync('/tmp/local-llm-chat-inline-check.mjs',match[1]);\" && node --check /tmp/local-llm-chat-inline-check.mjs"
+  }
+}
