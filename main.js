@@ -6,7 +6,7 @@ const STORE = {
   messages: "messages",
   settings: "settings",
 };
-const WEBLLM_INDEXED_DB_NAMES = ["webllm/config", "webllm/wasm", "webllm/model"];
+const WEBLLM_CACHE_NAMES = ["webllm/config", "webllm/wasm", "webllm/model"];
 
 const MODEL_LIB_BASE =
   "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_84/base";
@@ -292,12 +292,12 @@ function buildAppConfig(settings) {
   if (prebuilt && !settings.modelUrl && !settings.modelLib) {
     return {
       ...webllm.prebuiltAppConfig,
-      cacheBackend: "indexeddb",
+      cacheBackend: webLlmCacheBackend(),
     };
   }
 
   return {
-    cacheBackend: "indexeddb",
+    cacheBackend: webLlmCacheBackend(),
     model_list: [
       {
         model: settings.modelUrl,
@@ -383,13 +383,13 @@ async function clearChat() {
 
 async function clearIndexedDbData() {
   const confirmed = confirm(
-    "IndexedDB のチャット履歴、設定、モデルキャッシュを削除します。よろしいですか？",
+    "チャット履歴、設定、モデルキャッシュを削除します。よろしいですか？",
   );
   if (!confirmed) return;
 
   stopGeneration();
   setBusy(true);
-  setStatus("Clearing IndexedDB", 0.1);
+  setStatus("Clearing storage", 0.1);
 
   try {
     engine?.unload?.();
@@ -397,19 +397,28 @@ async function clearIndexedDbData() {
     db?.close();
     db = null;
     messages = [];
-    await Promise.all([
+    const deleteResults = await Promise.all([
       deleteDatabase(DB_NAME),
-      ...WEBLLM_INDEXED_DB_NAMES.map((dbName) => deleteDatabase(dbName)),
+      ...WEBLLM_CACHE_NAMES.map((dbName) => deleteDatabase(dbName)),
     ]);
+    await clearWebLlmCacheStorage();
     db = await openDb();
     applySettings(presets[DEFAULT_PRESET]);
     renderMessages();
     els.promptInput.disabled = true;
     els.sendButton.disabled = true;
-    setStatus("IndexedDB cleared. Load the model again.", 1);
+    const blockedNames = deleteResults
+      .filter((result) => result.blocked)
+      .map((result) => result.dbName);
+    setStatus(
+      blockedNames.length
+        ? `Storage cleared where possible. Blocked: ${blockedNames.join(", ")}. Reload or close other tabs, then clear again.`
+        : "Storage cleared. Load the model again.",
+      blockedNames.length ? 0.65 : 1,
+    );
   } catch (error) {
     setStatus(
-      `Failed to clear IndexedDB: ${error.message}. Close other tabs using this app and try again.`,
+      `Failed to clear storage: ${error.message}. Close other tabs using this app and try again.`,
       0,
     );
   } finally {
@@ -522,13 +531,35 @@ function requestToPromise(request) {
   });
 }
 
+function webLlmCacheBackend() {
+  return isAppleMobileBrowser() ? "cache" : "indexeddb";
+}
+
+function isAppleMobileBrowser() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+async function clearWebLlmCacheStorage() {
+  if (!("caches" in window)) return;
+  await Promise.all(WEBLLM_CACHE_NAMES.map((cacheName) => caches.delete(cacheName)));
+}
+
 function deleteDatabase(dbName) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const request = indexedDB.deleteDatabase(dbName);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve({ dbName, deleted: true, blocked: false });
+    request.onerror = () =>
+      resolve({
+        dbName,
+        deleted: false,
+        blocked: false,
+        error: request.error?.message ?? "unknown error",
+      });
     request.onblocked = () =>
-      reject(new Error(`Database "${dbName}" is blocked by an open connection`));
+      resolve({ dbName, deleted: false, blocked: true });
   });
 }
 
